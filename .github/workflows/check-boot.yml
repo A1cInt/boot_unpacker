@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download boot.img
-        run: curl -fsSL "https://sourceforge.net/projects/plato-evox/files/EvolutionX-16.0-20260514-plato-11.7-Unofficial/boot.img/download" -o boot.img
+        run: curl -L "https://sourceforge.net/projects/plato-evox/files/EvolutionX-16.0-20260514-plato-11.7-Unofficial/boot.img/download" -o boot.img
 
       - name: Run script
         run: |
@@ -27,10 +27,10 @@ jobs:
           
           install_magiskboot() {
               local magiskboot_url dest
-              magiskboot_url="https://github.com/nand-o/magiskboot-prebuilt/raw/main/linux_x86_64/magiskboot"
+              magiskboot_url="https://github.com/magisk-modules-repo/magiskboot_x86_64/raw/master/magiskboot"
               dest="/usr/local/bin/magiskboot"
           
-              sudo curl -fsSL "$magiskboot_url" -o "$dest"
+              sudo curl -fL "$magiskboot_url" -o "$dest" || err "Download failed"
               sudo chmod 755 "$dest"
           }
           
@@ -56,6 +56,7 @@ jobs:
           rc=$?
           
           if [ "$rc" -ne 0 ]; then
+              echo "$output"
               err "Failed to unpack boot image"
           fi
           
