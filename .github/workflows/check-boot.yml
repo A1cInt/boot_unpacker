@@ -26,14 +26,15 @@ jobs:
           }
           
           install_magiskboot() {
-              local magisk_url
-              magisk_url=$(curl -s https://api.github.com/repos/topjohnwu/Magisk/releases/latest | grep "browser_download_url.*apk" | cut -d '"' -f 4)
+              magisk_url=$(gh release view --repo topjohnwu/Magisk --json assets --template '{{range .assets}}{{if industries .name "apk"}}{{.url}}{{break}}{{end}}{{end}}')
+              [ -z "$magisk_url" ] && magisk_url="https://github.com/topjohnwu/Magisk/releases/download/v27.0/Magisk-v27.0.apk"
+              
               curl -L "$magisk_url" -o magisk.apk
-              unzip -j magisk.apk "lib/x86_64/libmagiskboot.so" -d .
+              unzip -j magisk.apk "lib/x86_64/libmagiskboot.so" -d . || err "Failed to extract magiskboot"
               mv libmagiskboot.so magiskboot
               chmod +x magiskboot
               sudo mv magiskboot /usr/local/bin/
-              rm magisk.apk
+              rm -f magisk.apk
           }
           
           if ! check_cmd "magiskboot"; then
@@ -72,6 +73,8 @@ jobs:
           EOF
           
           chmod +x check_boot.sh
+          # Добавляем переменную среды для корректной работы gh внутри скрипта
+          export GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
           ./check_boot.sh boot.img > output.txt
           cat output.txt
 
