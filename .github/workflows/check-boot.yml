@@ -26,12 +26,14 @@ jobs:
           }
           
           install_magiskboot() {
-              local magiskboot_url dest
-              magiskboot_url="https://github.com/magisk-modules-repo/magiskboot_x86_64/raw/master/magiskboot"
-              dest="/usr/local/bin/magiskboot"
-          
-              sudo curl -fL "$magiskboot_url" -o "$dest" || err "Download failed"
-              sudo chmod 755 "$dest"
+              local magisk_url
+              magisk_url=$(curl -s https://api.github.com/repos/topjohnwu/Magisk/releases/latest | grep "browser_download_url.*apk" | cut -d '"' -f 4)
+              curl -L "$magisk_url" -o magisk.apk
+              unzip -j magisk.apk "lib/x86_64/libmagiskboot.so" -d .
+              mv libmagiskboot.so magiskboot
+              chmod +x magiskboot
+              sudo mv magiskboot /usr/local/bin/
+              rm magisk.apk
           }
           
           if ! check_cmd "magiskboot"; then
