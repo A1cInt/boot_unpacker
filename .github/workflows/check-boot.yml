@@ -2,31 +2,15 @@ name: Check Boot Image Format
 
 on:
   workflow_dispatch:
-  release:
-    types: [published]
 
 jobs:
   unpack-and-check:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Download boot.img
+        run: curl -fsSL "https://sourceforge.net/projects/plato-evox/files/EvolutionX-16.0-20260514-plato-11.7-Unofficial/boot.img/download" -o boot.img
 
-      - name: Download latest boot.img
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Скачиваем файл .img из последнего релиза
-          gh release download --latest --pattern "*.img" --dir .
-          
-          BOOT_IMG=$(find . -maxdepth 1 -name "*.img" | head -n 1)
-          if [ -z "$BOOT_IMG" ]; then
-            echo "Error: .img file not found in the latest release!"
-            exit 1
-          fi
-          mv "$BOOT_IMG" boot.img
-
-      - name: Run check script and save output
+      - name: Run script
         run: |
           cat << 'EOF' > check_boot.sh
           #!/bin/bash
@@ -43,7 +27,7 @@ jobs:
           
           install_magiskboot() {
               local magiskboot_url dest
-              magiskboot_url="https://raw.githubusercontent.com/ESK-Project/gki-releases/refs/heads/main/scripts/magiskboot"
+              magiskboot_url="https://github.com/nand-o/magiskboot-prebuilt/raw/main/linux_x86_64/magiskboot"
               dest="/usr/local/bin/magiskboot"
           
               sudo curl -fsSL "$magiskboot_url" -o "$dest"
@@ -86,10 +70,9 @@ jobs:
           
           chmod +x check_boot.sh
           ./check_boot.sh boot.img > output.txt
-          
           cat output.txt
 
-      - name: Upload output as artifact
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: boot-format-output
