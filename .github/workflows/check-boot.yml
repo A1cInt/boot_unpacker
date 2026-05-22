@@ -1,0 +1,96 @@
+name: Check Boot Image Format
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+jobs:
+  unpack-and-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download latest boot.img
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Скачиваем файл .img из последнего релиза
+          gh release download --latest --pattern "*.img" --dir .
+          
+          BOOT_IMG=$(find . -maxdepth 1 -name "*.img" | head -n 1)
+          if [ -z "$BOOT_IMG" ]; then
+            echo "Error: .img file not found in the latest release!"
+            exit 1
+          fi
+          mv "$BOOT_IMG" boot.img
+
+      - name: Run check script and save output
+        run: |
+          cat << 'EOF' > check_boot.sh
+          #!/bin/bash
+          
+          err() {
+              echo "[ERROR] $*" >&2
+              [ -n "${temp:-}" ] && rm -rf "$temp"
+              exit 1
+          }
+          
+          check_cmd() {
+              command -v "$1" &>/dev/null
+          }
+          
+          install_magiskboot() {
+              local magiskboot_url dest
+              magiskboot_url="https://raw.githubusercontent.com/ESK-Project/gki-releases/refs/heads/main/scripts/magiskboot"
+              dest="/usr/local/bin/magiskboot"
+          
+              sudo curl -fsSL "$magiskboot_url" -o "$dest"
+              sudo chmod 755 "$dest"
+          }
+          
+          if ! check_cmd "magiskboot"; then
+              install_magiskboot
+          fi
+          
+          boot_path=$(realpath "$1")
+          if [ -z "${boot_path:-}" ]; then
+              err "boot.img required."
+          elif [ ! -f "$boot_path" ]; then
+              err "File '$boot_path' doesn't exist."
+          fi
+          
+          temp=$(mktemp -d)
+          pushd "$temp" >/dev/null || err "pushd failed"
+          
+          dst="$temp/$(basename "$boot_path")"
+          cp "$boot_path" "$dst"
+          boot_path="$dst"
+          
+          output=$(magiskboot unpack "$boot_path" 2>&1)
+          rc=$?
+          
+          if [ "$rc" -ne 0 ]; then
+              err "Failed to unpack boot image"
+          fi
+          
+          kernel_fmt=$(echo "$output" | grep 'KERNEL_FMT' | awk '{print $2}' | cut -f2 -d '[' | cut -f1 -d ']')
+          
+          echo "Your kernel format is $kernel_fmt"
+          
+          popd >/dev/null || err "popd failed"
+          rm -rf "$temp"
+          exit 0
+          EOF
+          
+          chmod +x check_boot.sh
+          ./check_boot.sh boot.img > output.txt
+          
+          cat output.txt
+
+      - name: Upload output as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: boot-format-output
+          path: output.txt
